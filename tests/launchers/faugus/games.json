@@ -1,0 +1,35 @@
+[
+    {
+        "gameid": "exact-match",
+        "title": "Exact Match",
+        "path": "/path/to/game/exe",
+        "prefix": "/home/user/Faugus/game-title",
+        "launch_arguments": "",
+        "game_arguments": "",
+        "mangohud": "",
+        "gamemode": "",
+        "disable_hidraw": "",
+        "protonfix": "",
+        "runner": "Proton-CachyOS Latest",
+        "addapp_checkbox": "",
+        "addapp": "",
+        "addapp_bat": "/path/to/game/faugus-game-title.bat",
+        "addapp_delay": "",
+        "addapp_first": false,
+        "banner": "/usr/share/faugus-launcher/faugus-banner.png",
+        "lossless_enabled": false,
+        "lossless_multiplier": 1,
+        "lossless_flow": 100,
+        "lossless_performance": false,
+        "lossless_hdr": false,
+        "lossless_present": false,
+        "playtime": 0,
+        "hidden": false,
+        "prevent_sleep": false,
+        "category": false
+    },
+    {
+        "gameid": "fuzzy-match",
+        "title": "fuZZy: MATch™"
+    }
+]
