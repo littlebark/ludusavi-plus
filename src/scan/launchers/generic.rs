@@ -59,12 +59,93 @@ fn parse_appid_file(path: &Path) -> Option<u32> {
     trimmed.parse::<u32>().ok()
 }
 
+/// Try to extract a Steam AppID from an ini/config file in the given directory.
+/// Checks: SteamConfig.ini, SmartSteamEmu.ini, steam_appid.txt,
+/// steam_settings/steam_appid.txt, flt.ini.
+/// Matches patterns like `AppID=123456` or `AppId = 123456` or bare number lines.
+fn read_appid_from_ini_at(dir: &Path) -> Option<u32> {
+    let patterns = [
+        "SteamConfig.ini",
+        "SmartSteamEmu.ini",
+        "steam_appid.txt",
+        "steam_settings/steam_appid.txt",
+        "flt.ini",
+    ];
+    let re = regex::Regex::new(r"(?im)^\s*(?:AppID|AppId|appid)\s*=\s*(\d{3,8})\s*$").ok()?;
+    for rel in patterns {
+        let full = dir.join(rel);
+        if let Ok(text) = fs::read_to_string(&full) {
+            // steam_appid.txt is just a number, not ini format
+            if rel.ends_with("steam_appid.txt") {
+                if let Ok(id) = text.trim().parse::<u32>() {
+                    return Some(id);
+                }
+                continue;
+            }
+            if let Some(caps) = re.captures(&text) {
+                if let Some(m) = caps.get(1) {
+                    if let Ok(id) = m.as_str().parse::<u32>() {
+                        return Some(id);
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Search upward up to 5 levels for ini-based AppID, then downward up to 6 levels.
+fn appid_from_config(game_dir: &Path) -> Option<u32> {
+    // Search upward
+    let mut cur = game_dir.to_path_buf();
+    for _ in 0..5 {
+        if let Some(id) = read_appid_from_ini_at(&cur) {
+            return Some(id);
+        }
+        match cur.parent() {
+            Some(p) => cur = p.to_path_buf(),
+            None => break,
+        }
+    }
+    // Search downward recursively up to 6 levels
+    for entry in WalkDir::new(game_dir)
+        .max_depth(6)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        // Skip hidden and $-prefixed directories
+        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+            if name.starts_with('.') || name.starts_with('$') {
+                continue;
+            }
+        }
+        if let Some(id) = read_appid_from_ini_at(path) {
+            return Some(id);
+        }
+    }
+    None
+}
+
+/// Extract a trailing numeric segment from the path (e.g., .../2288630).
+fn appid_from_path(game_dir: &Path) -> Option<u32> {
+    let last = game_dir.file_name()?.to_str()?;
+    let re = regex::Regex::new(r"(\d+)$").ok()?;
+    let caps = re.captures(last)?;
+    caps.get(1)?.as_str().parse::<u32>().ok()
+}
+
 /// Detect a Steam AppID from a game install directory.
 ///
 /// Mirrors the logic from `detect-steam-game.mjs`:
 /// 1. Check `steam_appid.txt` directly in the directory.
 /// 2. Check `steam_settings/steam_appid.txt`.
-/// 3. Recurse up to 4 levels deep for `steam_appid.txt` (common with emulated releases).
+/// 3. Recurse up to 8 levels deep for `steam_appid.txt` (common with emulated releases).
+/// 4. Check ini files (SmartSteamEmu/SSE/flt) for AppID — up 5, then down 6.
+/// 5. Fallback: trailing number in folder name.
 fn detect_steam_appid(game_dir: &Path) -> Option<u32> {
     // 1. Direct file
     let direct = game_dir.join("steam_appid.txt");
@@ -78,13 +159,19 @@ fn detect_steam_appid(game_dir: &Path) -> Option<u32> {
         return Some(id);
     }
 
-    // 3. Recurse up to depth 4 (skip hidden dirs and $-prefixed dirs)
+    // 3. Recurse up to depth 8 (skip hidden dirs and $-prefixed dirs)
     for entry in WalkDir::new(game_dir)
-        .max_depth(4)
+        .max_depth(8)
         .into_iter()
         .filter_map(|e| e.ok())
     {
         let path = entry.path();
+        // Skip hidden and $-prefixed directories
+        if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+            if name.starts_with('.') || name.starts_with('$') {
+                continue;
+            }
+        }
         if !path.is_file() {
             continue;
         }
@@ -96,7 +183,13 @@ fn detect_steam_appid(game_dir: &Path) -> Option<u32> {
         }
     }
 
-    None
+    // 4. Ini-based detection (SmartSteamEmu/SSE/flt)
+    if let Some(id) = appid_from_config(game_dir) {
+        return Some(id);
+    }
+
+    // 5. Trailing number in path
+    appid_from_path(game_dir)
 }
 
 pub fn scan(root: &Root, manifest: &Manifest, subjects: &[String]) -> HashMap<String, HashSet<LauncherGame>> {
