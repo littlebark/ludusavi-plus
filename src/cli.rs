@@ -172,8 +172,9 @@ pub fn run(sub: Subcommand, no_manifest_update: bool, try_manifest_update: bool)
             include_disabled,
             ask_downgrade,
             games,
+            steam_id,
         } => {
-            let games = parse_games(games);
+            let mut games = parse_games(games);
 
             let mut reporter = if api { Reporter::json() } else { Reporter::standard() };
 
@@ -203,6 +204,30 @@ pub fn run(sub: Subcommand, no_manifest_update: bool, try_manifest_update: bool)
 
             let layout = BackupLayout::new(backup_dir.clone());
             let title_finder = TitleFinder::new(&config, &manifest, layout.restorable_game_set());
+
+            // If steam_id is provided, resolve it to a game name as a fallback.
+            if let Some(sid) = steam_id {
+                if let Some(found) = title_finder.find_one(TitleQuery {
+                    names: vec![],
+                    steam_id: Some(sid),
+                    ..Default::default()
+                }) {
+                    log::info!("Resolved steam_id {sid} to game: {found}");
+                    if games.is_empty() {
+                        games = vec![found];
+                    } else if !games.iter().any(|g| g == &found) {
+                        // If the provided names didn't resolve, use the steam_id result.
+                        match evaluate_games(manifest.primary_titles(), games.clone(), &title_finder) {
+                            Ok(_) => {} // names already work, don't override
+                            Err(_) => {
+                                games = vec![found];
+                            }
+                        }
+                    }
+                } else {
+                    log::warn!("Could not resolve steam_id {sid} to a known game");
+                }
+            }
 
             let games_specified = !games.is_empty();
             let games = match evaluate_games(manifest.primary_titles(), games, &title_finder) {
@@ -475,8 +500,9 @@ pub fn run(sub: Subcommand, no_manifest_update: bool, try_manifest_update: bool)
             include_disabled,
             ask_downgrade,
             games,
+            steam_id,
         } => {
-            let games = parse_games(games);
+            let mut games = parse_games(games);
 
             let mut reporter = if api { Reporter::json() } else { Reporter::standard() };
 
@@ -504,6 +530,29 @@ pub fn run(sub: Subcommand, no_manifest_update: bool, try_manifest_update: bool)
 
             let manifest = load_manifest(&config, &mut cache, true, false).unwrap_or_default();
             let title_finder = TitleFinder::new(&config, &manifest, layout.restorable_game_set());
+
+            // If steam_id is provided, resolve it to a game name as a fallback.
+            if let Some(sid) = steam_id {
+                if let Some(found) = title_finder.find_one(TitleQuery {
+                    names: vec![],
+                    steam_id: Some(sid),
+                    ..Default::default()
+                }) {
+                    log::info!("Resolved steam_id {sid} to game: {found}");
+                    if games.is_empty() {
+                        games = vec![found];
+                    } else if !games.iter().any(|g| g == &found) {
+                        match evaluate_games(layout.restorable_game_set(), games.clone(), &title_finder) {
+                            Ok(_) => {}
+                            Err(_) => {
+                                games = vec![found];
+                            }
+                        }
+                    }
+                } else {
+                    log::warn!("Could not resolve steam_id {sid} to a known game");
+                }
+            }
 
             let games_specified = !games.is_empty();
             let games = match evaluate_games(layout.restorable_game_set(), games, &title_finder) {
@@ -1196,6 +1245,7 @@ pub fn run(sub: Subcommand, no_manifest_update: bool, try_manifest_update: bool)
                         dump_registry: Default::default(),
                         include_disabled: Default::default(),
                         ask_downgrade,
+                        steam_id: Default::default(),
                     },
                     no_manifest_update,
                     try_manifest_update,
@@ -1267,6 +1317,7 @@ pub fn run(sub: Subcommand, no_manifest_update: bool, try_manifest_update: bool)
                         dump_registry: Default::default(),
                         include_disabled: Default::default(),
                         ask_downgrade,
+                        steam_id: Default::default(),
                     },
                     no_manifest_update,
                     try_manifest_update,

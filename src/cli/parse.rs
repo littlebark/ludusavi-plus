@@ -240,6 +240,11 @@ pub enum Subcommand {
         /// Alternatively supports stdin (one value per line).
         #[clap()]
         games: Vec<String>,
+
+        /// Steam App ID to look up a game when the name doesn't match.
+        /// This is useful for launchers that pass localized names.
+        #[clap(long)]
+        steam_id: Option<u32>,
     },
     /// Restore data
     Restore {
@@ -317,6 +322,11 @@ pub enum Subcommand {
         /// Alternatively supports stdin (one value per line).
         #[clap()]
         games: Vec<String>,
+
+        /// Steam App ID to look up a game when the name doesn't match.
+        /// This is useful for launchers that pass localized names.
+        #[clap(long)]
+        steam_id: Option<u32>,
     },
     /// Generate shell completion scripts
     Complete {

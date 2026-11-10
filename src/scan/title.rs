@@ -19,12 +19,16 @@ static RE_EDITION_KNOWN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#" (game
 /// We can't assume more than one word because it may be part of the main title.
 static RE_EDITION_SHORT: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#" [^ ]+ edition$"#).unwrap());
 static RE_YEAR_SUFFIX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r" \(\d+\)$").unwrap());
+/// Strip parenthetical content that contains non-ASCII (e.g., Chinese) characters,
+/// which are commonly added by launchers like Playnite as localized subtitles.
+static RE_PAREN_NONASCII: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\([^)]*[^\x00-\x7F][^)]*\)").unwrap());
 static RE_SYMBOLS_GAP: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"[™®©:-]"#).unwrap());
 static RE_SYMBOLS_NO_GAP: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"['"‘’“”]"#).unwrap());
 static RE_SPACES: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#" {2,}"#).unwrap());
 
 pub fn normalize_title(title: &str) -> String {
     let normalized = title.to_lowercase();
+    let normalized = RE_PAREN_NONASCII.replace_all(&normalized, "");
     let normalized = RE_YEAR_SUFFIX.replace_all(&normalized, "");
     let normalized = RE_EDITION_PUNCTUATED.replace_all(&normalized, "");
     let normalized = RE_EDITION_KNOWN.replace_all(&normalized, "");
@@ -147,6 +151,7 @@ impl TitleFinder {
     pub fn find_one_by_name(&self, name: &str) -> Option<String> {
         self.find_one(TitleQuery {
             names: vec![name.to_string()],
+            normalized: true,
             ..Default::default()
         })
     }
