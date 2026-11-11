@@ -4,21 +4,37 @@
 > All original credit goes to Matthew T. Kennerly and contributors.
 > This fork adds Steam AppID-based game detection for custom ("other") root directories.
 
-## What's different in this fork
+## 本 fork 改动说明
 
-The original Ludusavi identifies games in a custom root directory by fuzzy-matching
-subfolder names against the manifest's `installDir` entries. This fails when the
-folder name doesn't closely match the expected naming pattern (e.g., `Fate Samurai
-Remnant` vs. the manifest's `FateSamuraiRemnant`).
+### 自定义根目录的 Steam AppID 自动检测
 
-**This fork adds a fallback:** for subfolders that fuzzy matching couldn't identify,
-it reads `steam_appid.txt` (and checks `steam_settings/` subfolder, up to 4 levels
-deep) to extract the Steam AppID, then reverse-looks-up the game via the manifest's
-`steam.id` field. This allows Ludusavi to correctly resolve `<base>`/`<game>`
-path placeholders even when the folder name doesn't match.
+原版 Ludusavi 对自定义根目录（类型"其他"）下的游戏，是通过文件夹名与 manifest 的 `installDir` 做模糊匹配来识别的。当文件夹名与官方命名差异较大时（如 `Fate Samurai Remnant` vs manifest 里的 `FateSamuraiRemnant`），或者是 Goldberg 模拟器打包的中文/破解版文件夹名，就会匹配失败。
 
-Modified file: `src/scan/launchers/generic.rs` (Phase 2 fallback added after the
-original fuzzy-matching phase).
+**本 fork 新增 `detect_steam_appid()`**，采用 5 层 fallback 检测：
+
+1. **直接文件**：`<游戏目录>/steam_appid.txt`
+2. **steam_settings 子目录**：`<游戏目录>/steam_settings/steam_appid.txt`
+3. **递归搜索**：向下最多 8 层查找 `steam_appid.txt`，跳过隐藏目录（`.`开头）和 `$` 开头的目录
+4. **ini 配置文件**：向上搜索 5 层目录、向下递归搜索 6 层，识别 `SteamConfig.ini`、`SmartSteamEmu.ini`、`flt.ini` 中的 `AppID=123456` 格式，同时检查每层的 `steam_appid.txt` 和 `steam_settings/steam_appid.txt`
+5. **路径末尾数字**：如果文件夹名以数字结尾（如 `game/2288630`），取该数字作为 AppID
+
+检测到 AppID 后，通过 manifest 的 `steam.id` 字段反查官方游戏条目，正确解析 `<base>`/`<game>` 路径占位符。
+
+修改文件：`src/scan/launchers/generic.rs`
+
+### 游戏名归一化
+
+改进 `find_one_by_name`，自动剥除非 ASCII 字符的括号副标题（如 `"STAR OCEAN THE SECOND STORY R (星之海洋2 第二个故事R)"` → `"STAR OCEAN THE SECOND STORY R"`），并默认启用归一化匹配。
+
+修改文件：`src/scan/title.rs`
+
+### 命令行新增 `--steam-id` 参数
+
+给 `backup` 和 `restore` 子命令添加 `--steam-id <ID>` 参数。当名字匹配失败时，通过 AppID 反查 manifest 兜底。
+
+修改文件：`src/cli/parse.rs`、`src/cli.rs`
+
+---
 
 ---
 
