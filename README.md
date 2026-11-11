@@ -8,7 +8,7 @@
 
 ### 自定义根目录的 Steam AppID 自动检测
 
-原版 Ludusavi 对自定义根目录（类型"其他"）下的游戏，是通过文件夹名与 manifest 的 `installDir` 做模糊匹配来识别的。当文件夹名与官方命名差异较大时（如 `Fate Samurai Remnant` vs manifest 里的 `FateSamuraiRemnant`），或者是 Goldberg 模拟器打包的中文/破解版文件夹名，就会匹配失败。
+原版 Ludusavi 对自定义根目录（类型"其他"）下的游戏，是通过文件夹名与 manifest 的 `installDir` 做模糊匹配来识别的。当文件夹名与官方命名差异较大时（如 `Fate Samurai Remnant` vs manifest 里的 `FateSamuraiRemnant`），或者是 打过Goldberg 模拟器补丁的文件夹名，就会匹配失败。
 
 **本 fork 新增 `detect_steam_appid()`**，采用 5 层 fallback 检测：
 
