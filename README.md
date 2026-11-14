@@ -10,13 +10,14 @@
 
 原版 Ludusavi 对自定义根目录（类型"其他"）下的游戏，是通过文件夹名与 manifest 的 `installDir` 做模糊匹配来识别的。当文件夹名与官方命名差异较大时（如 `Fate Samurai Remnant` vs manifest 里的 `FateSamuraiRemnant`），或者是 打过Goldberg 模拟器补丁的文件夹名，就会匹配失败。
 
-**本 fork 新增 `detect_steam_appid()`**，采用 5 层 fallback 检测：
+**本 fork 新增 `detect_steam_appid()`**，采用 4 路 fallback 检测：
 
-1. **直接文件**：`<游戏目录>/steam_appid.txt`
-2. **steam_settings 子目录**：`<游戏目录>/steam_settings/steam_appid.txt`
-3. **递归搜索**：向下最多 8 层查找 `steam_appid.txt`，跳过隐藏目录（`.`开头）和 `$` 开头的目录
-4. **ini 配置文件**：向上搜索 5 层目录、向下递归搜索 6 层，识别 `SteamConfig.ini`、`SmartSteamEmu.ini`、`flt.ini` 中的 `AppID=123456` 格式，同时检查每层的 `steam_appid.txt` 和 `steam_settings/steam_appid.txt`
-5. **路径末尾数字**：如果文件夹名以数字结尾（如 `game/2288630`），取该数字作为 AppID
+1. **`steam_appid.txt`**：先在游戏根目录和 `steam_settings/` 下查；找不到则**按文件名全树搜索（不限深度）**，命中多个时优先路径最浅的那个
+2. **`steam_emu.ini` / `rune.ini`**：RUNE 等模拟器不生成 `steam_appid.txt`，AppID 写在 ini 的 `AppId=` 行，且常埋在任意深度（如 UE 的 `Engine/Binaries/.../Win64/`）。全树搜索，并**优先取与 `steam_api.dll` / `steam_api64.dll` 同目录的那份**
+3. **其他模拟器配置**：全树搜索 `SteamConfig.ini`、`SmartSteamEmu.ini`、`flt.ini`、`steam_appid.txt`，匹配 `AppID=123456`、`AppId = 123456` 或裸数字行
+4. **路径末尾数字**：路径最后一段以数字结尾时（如 `.../2288630`），取该数字；会先剥掉 `\stats`、`\SteamEmu`、`\SteamEmu\UserStats` 这类模拟器统计目录后缀
+
+全树搜索的约束：跳过 `node_modules`、`.git`、`.svn`、`.hg`、`__MACOSX` 目录；单次扫描上限 20 万个目录项；不跟随符号链接目录（防止目录环）。
 
 检测到 AppID 后，通过 manifest 的 `steam.id` 字段反查官方游戏条目，正确解析 `<base>`/`<game>` 路径占位符。
 
